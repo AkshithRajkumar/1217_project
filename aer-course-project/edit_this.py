@@ -126,16 +126,10 @@ class Controller():
     def generate_points(self, point1, point2, num_waypoints):
         
         wp =[]
-        # m = (point2[1]-point1[1])/(point2[0]-point1[0])
-        # c = point1[1] - m * point1[0]
-
-        # for x in range(int(min(point1[0], point2[0])), int(max(point1[0],point2[0]))):
-        #     y = m*x + c
-        #     wp.append((x,y,1))
         for n in range(num_waypoints):
             ratio = n/(num_waypoints)
-            x = point1[0] + abs(point2[0]- point1[0])*ratio
-            y = point1[1] + abs(point2[1]- point1[1])*ratio
+            x = point1[0] + ((point2[0]- point1[0])*ratio)
+            y = point1[1] + ((point2[1]- point1[1])*ratio)
             wp.append((x,y,1))
             
         return wp
@@ -162,7 +156,7 @@ class Controller():
                 
             dest = GateList[j].calc_sequence(source_x , source_y)
             # print("initial",[self.initial_obs[0], self.initial_obs[2]])
-            # print("dest", dest[0])
+            print("dest", dest[0])
 
             wp = self.generate_points([source_x, source_y], dest[0], num_waypoints)
             WP = WP + wp
@@ -171,7 +165,7 @@ class Controller():
 
             source_x = dest[2][0]
             source_y = dest[2][1]    
-            print(WP)
+            print(dest[2])
         self.waypoints = np.array(WP)
         # print(self.waypoints)
         # Call a function in module `example_custom_utils`.

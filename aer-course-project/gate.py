@@ -7,7 +7,7 @@ class Gate() :
         self.phi = phi
         self.calc_entry_exit_gates(delta)
     def calc_entry_exit_gates(self, delta) :
-        if self.phi < 0 :
+        if self.phi != 0 :
             self.entry = [self.x + delta, self.y]
             self.exit = [self.x - delta, self.y]
         else :
