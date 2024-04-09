@@ -27,7 +27,7 @@ Tips:
 
 """
 import numpy as np
-
+import math
 from collections import deque
 
 try:
@@ -121,6 +121,20 @@ class Controller():
 
         # Draw the trajectory on PyBullet's GUI.
         draw_trajectory(initial_info, self.waypoints, self.ref_x, self.ref_y, self.ref_z)
+
+    def check_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R) :
+        Dist = math.sqrt((PointX - ObstacleX)**2 + (PointY - ObstacleY)**2)
+        if Dist > R + 3 :
+            return False
+        return True
+    
+    def remove_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R, prevCoorX, prevCoorY) :
+        Point1 = [PointX + R, PointY]
+        Point2 = [PointX - R, PointY]
+        Point3 = [PointX, PointY + R]
+        Point4 = [PointX, PointY - R]
+
+        Dist1 = math.sqrt(())
 
 
     def generate_points(self, point1, point2, num_waypoints):
