@@ -1,10 +1,11 @@
 import math
 class Gate() :
-    def __init__(self, x, y, z, phi) :
+    def __init__(self, x, y, z, phi, delta) :
         self.x = x
         self.y = y
         self.z = z
         self.phi = phi
+        self.calc_entry_exit_gates(delta)
     def calc_entry_exit_gates(self, delta) :
         if self.phi < 0 :
             self.entry = [self.x + delta, self.y]
