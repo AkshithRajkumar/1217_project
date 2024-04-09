@@ -45,7 +45,7 @@ except ImportError:
 
 from gate import Gate
 import random
-
+import heapq
 try:
     import example_custom_utils as ecu
 except ImportError:
@@ -121,6 +121,23 @@ class Controller():
 
         # Draw the trajectory on PyBullet's GUI.
         draw_trajectory(initial_info, self.waypoints, self.ref_x, self.ref_y, self.ref_z)
+    
+    def obstacle_list(self, NOMINAL_OBSTACLES, NOMINAL_GATES) :
+        ObstacleList = []
+        for i in self.NOMINAL_OBSTACLES :
+            ObstacleList.append([i[0], i[1], i[2], i[5],0])
+        for j in self.NOMINAL_GATES :
+            ObstacleList.append([j[0], j[1], j[2], j[5],1])
+        return ObstacleList
+    
+    def remove_goal_gate(self, ObstacleList, destination):
+        for i in range(len(ObstacleList)) :
+            if ObstacleList[i][4] == 1 :
+                if ObstacleList[i][0] == destination[0] and ObstacleList[i][1] == destination[1] :
+                    ObstacleList.pop(i)
+                    break
+        return ObstacleList
+
 
     def check_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R) :
         Dist = math.sqrt((PointX - ObstacleX)**2 + (PointY - ObstacleY)**2)
@@ -161,6 +178,57 @@ class Controller():
     #             return Point3
     #         else :
     #             return Point4
+    
+    def euclidean_distance(self, coord1, coord2):
+        x1, y1, z1 = coord1
+        x2, y2, z2 = coord2
+        return ((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2) ** 0.5
+
+    def generate_neighbors(self, current_coord, all_coords, distance_threshold):
+        neighbors = []
+        for coord in all_coords:
+            if self.euclidean_distance(current_coord, coord) <= distance_threshold:
+                neighbors.append(coord)
+        return neighbors
+    
+    def reconstruct_path(self, came_from, current):
+        total_path = [current]
+        while current in came_from:
+            current = came_from[current]
+            total_path.append(current)
+        return list(reversed(total_path))
+
+    def astar(self, start, goal, all_coords):
+        open_list = [(0, start)]  # Priority queue of (f-score, node)
+        closed_set = set()
+        came_from = {}
+        g_score = {coord: float('inf') for coord in all_coords}
+        g_score[start] = 0
+        f_score = {coord: float('inf') for coord in all_coords}
+        f_score[start] = self.euclidean_distance(start, goal)
+
+        while open_list:
+            _, current = heapq.heappop(open_list)
+
+            if current == goal:
+                return self.reconstruct_path(came_from, current)
+
+            closed_set.add(current)
+
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=2.0):
+                if neighbor in closed_set:
+                    continue
+
+                tentative_g_score = g_score[current] + self.euclidean_distance(current, neighbor)
+
+                if tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = g_score[neighbor] + self.euclidean_distance(neighbor, goal)
+                    heapq.heappush(open_list, (f_score[neighbor], neighbor))
+
+        return None  # No path found
+
 
     def generate_points(self, point1, point2, num_waypoints):
         
@@ -195,7 +263,7 @@ class Controller():
                 
             dest = GateList[j].calc_sequence(source_x , source_y)
             # print("initial",[self.initial_obs[0], self.initial_obs[2]])
-            print("dest", dest[0])
+            # print("dest", dest[0])
 
             wp = self.generate_points([source_x, source_y], dest[0], num_waypoints)
             WP = WP + wp
@@ -204,7 +272,10 @@ class Controller():
 
             source_x = dest[2][0]
             source_y = dest[2][1]    
-            print(dest[2])
+            # print(dest[2])
+
+        for way in WP[:1]:
+            print(way[0],way[1])    
         self.waypoints = np.array(WP)
         # print(self.waypoints)
         # Call a function in module `example_custom_utils`.
