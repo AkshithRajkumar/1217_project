@@ -124,18 +124,43 @@ class Controller():
 
     def check_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R) :
         Dist = math.sqrt((PointX - ObstacleX)**2 + (PointY - ObstacleY)**2)
-        if Dist > R + 3 :
+        if Dist > R + 0.5 :
             return False
         return True
     
-    def remove_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R, prevCoorX, prevCoorY) :
-        Point1 = [PointX + R, PointY]
-        Point2 = [PointX - R, PointY]
-        Point3 = [PointX, PointY + R]
-        Point4 = [PointX, PointY - R]
+    def points_on_circumference(center, radius, num_points):
+        points = []
+        cx, cy = center  # Center coordinates
+        for i in range(num_points):
+            angle = (2 * math.pi * i) / num_points
+            x = cx + radius * math.cos(angle)
+            y = cy + radius * math.sin(angle)
+            points.append((x, y))
+        return points
+    
+    def create_peripheral_coordinates_around_obstcl(self, ObstacleX, ObstacleY, R) :
+        return self.points_on_circumference((ObstacleX, ObstacleY), R + 0.5, 8)
 
-        Dist1 = math.sqrt(())
+    
+    # def remove_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R, prevCoorX, prevCoorY) :
+    #     Point1 = [PointX + R, PointY]
+    #     Point2 = [PointX - R, PointY]
+    #     Point3 = [PointX, PointY + R]
+    #     Point4 = [PointX, PointY - R]
 
+    #     Dist1 = math.sqrt((Point1[0] - prevCoorX)**2 + (Point1[1] - prevCoorY)**2)
+    #     Dist2 = math.sqrt((Point3[0] - prevCoorX)**2 + (Point3[1] - prevCoorY)**2)
+
+    #     if Dist1 < Dist2 :
+    #         if self.check_obstacle(Point1[0], Point1[1], ObstacleX, ObstacleY, R) :
+    #             return Point1
+    #         else :
+    #             return Point2
+    #     else :
+    #         if self.check_obstacle(Point3[0], Point3[1], ObstacleX, ObstacleY, R) :
+    #             return Point3
+    #         else :
+    #             return Point4
 
     def generate_points(self, point1, point2, num_waypoints):
         
