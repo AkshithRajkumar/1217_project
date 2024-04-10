@@ -130,13 +130,13 @@ class Controller():
             ObstacleList.append([j[0], j[1], j[2], j[5],1])
         return ObstacleList
     
-    def remove_goal_gate(self, ObstacleList, destination):
-        for i in range(len(ObstacleList)) :
-            if ObstacleList[i][4] == 1 :
-                if ObstacleList[i][0] == destination[0] and ObstacleList[i][1] == destination[1] :
-                    ObstacleList.pop(i)
-                    break
-        return ObstacleList
+    # def remove_goal_gate(self, ObstacleList, destination):
+    #     for i in range(len(ObstacleList)) :
+    #         if ObstacleList[i][4] == 1 :
+    #             if ObstacleList[i][0] == destination[0] and ObstacleList[i][1] == destination[1] :
+    #                 ObstacleList.pop(i)
+    #                 break
+    #     return ObstacleList
 
 
     def check_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R) :
@@ -145,18 +145,18 @@ class Controller():
             return False
         return True
     
-    def points_on_circumference(center, radius, num_points):
+    def points_on_circumference(self, center, radius, num_points):
         points = []
         cx, cy = center  # Center coordinates
         for i in range(num_points):
             angle = (2 * math.pi * i) / num_points
             x = cx + radius * math.cos(angle)
             y = cy + radius * math.sin(angle)
-            points.append((x, y))
+            points.append((x, y, 1))
         return points
     
     def create_peripheral_coordinates_around_obstcl(self, ObstacleX, ObstacleY, R) :
-        return self.points_on_circumference((ObstacleX, ObstacleY), R + 0.5, 8)
+        return self.points_on_circumference((ObstacleX, ObstacleY), R + 0.3, 8)
 
     
     # def remove_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R, prevCoorX, prevCoorY) :
@@ -178,7 +178,7 @@ class Controller():
     #             return Point3
     #         else :
     #             return Point4
-    
+
     def euclidean_distance(self, coord1, coord2):
         x1, y1, z1 = coord1
         x2, y2, z2 = coord2
@@ -186,9 +186,20 @@ class Controller():
 
     def generate_neighbors(self, current_coord, all_coords, distance_threshold):
         neighbors = []
+        # print(current_coord)
         for coord in all_coords:
+            ifFlag = False
+            # print(coord)
+            # half = (np.array(current_coord) + np.array(coord))/2
+            half = ((current_coord[0] + coord[0])/2, (current_coord[1] + coord[1])/2, (current_coord[2] + coord[2])/2)
             if self.euclidean_distance(current_coord, coord) <= distance_threshold:
-                neighbors.append(coord)
+                for o in self.ObstList:
+                    if o[4] == 0:
+                        if self.check_obstacle(half[0], half[1], o[0], o[1], 0.06) :
+                            ifFlag = True
+                            break
+                if not ifFlag :
+                    neighbors.append(coord)
         return neighbors
     
     def reconstruct_path(self, came_from, current):
@@ -215,7 +226,7 @@ class Controller():
 
             closed_set.add(current)
 
-            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=2.0):
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=1):
                 if neighbor in closed_set:
                     continue
 
@@ -230,14 +241,21 @@ class Controller():
         return None  # No path found
 
 
-    def generate_points(self, point1, point2, num_waypoints):
+    def generate_points(self, point1, point2, num_waypoints, ObstacleList):
         
         wp =[]
         for n in range(num_waypoints):
             ratio = n/(num_waypoints)
             x = point1[0] + ((point2[0]- point1[0])*ratio)
             y = point1[1] + ((point2[1]- point1[1])*ratio)
-            wp.append((x,y,1))
+            IsObstacle = False
+            for o in ObstacleList:
+                if o[4] == 0:
+                    if self.check_obstacle(x,y,o[0],o[1],0.06) :
+                        IsObstacle = True
+                        break
+            if not IsObstacle :
+                wp.append((x,y,1))
             
         return wp
     
@@ -251,10 +269,18 @@ class Controller():
         num_waypoints = 5
         WP = []
         GateList = []
+        path = []
+
+        self.ObstList = self.obstacle_list(self.NOMINAL_OBSTACLES, self.NOMINAL_GATES)   
+
+        for o in self.ObstList:
+            if o[4] == 0:
+                WP = WP + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], 0.06)  
 
         for i in self.NOMINAL_GATES :
             GateList.append(Gate(i[0],i[1], i[2], i[5], delta))
 
+        
         for j in range(len(self.NOMINAL_GATES)):
 
             if j == 0:
@@ -262,22 +288,25 @@ class Controller():
                 source_y = self.initial_obs[2]
                 
             dest = GateList[j].calc_sequence(source_x , source_y)
-            # print("initial",[self.initial_obs[0], self.initial_obs[2]])
-            # print("dest", dest[0])
 
-            wp = self.generate_points([source_x, source_y], dest[0], num_waypoints)
+            wp = self.generate_points([source_x, source_y], dest[0], num_waypoints, self.ObstList)
+
             WP = WP + wp
-            for i in range(3):
+
+            nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList)
+
+            for i in range(5):
                 WP.append((dest[i][0],dest[i][1],1))
 
+            WP = WP + nwp
+            path = path + self.astar((source_x,source_y, 1), (dest[1][0],dest[1][1],1), all_coords=WP)
+            path = path + self.astar((dest[1][0],dest[1][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
+            
             source_x = dest[2][0]
             source_y = dest[2][1]    
-            # print(dest[2])
 
-        for way in WP[:1]:
-            print(way[0],way[1])    
-        self.waypoints = np.array(WP)
-        # print(self.waypoints)
+
+        self.waypoints = np.array(path)
         # Call a function in module `example_custom_utils`.
         ecu.exampleFunction()
 
@@ -298,7 +327,7 @@ class Controller():
 
         # Polynomial fit.
         # self.waypoints = np.array(waypoints)
-        deg = 6
+        deg = 12
         t = np.arange(self.waypoints.shape[0])
         # print("t",t)
         fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
