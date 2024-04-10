@@ -226,7 +226,7 @@ class Controller():
 
             closed_set.add(current)
 
-            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=1):
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=1.5):
                 if neighbor in closed_set:
                     continue
 
@@ -254,11 +254,29 @@ class Controller():
                     if self.check_obstacle(x,y,o[0],o[1],0.06) :
                         IsObstacle = True
                         break
-            if not IsObstacle :
+            IsCollidingWithGate = self.check_if_point_colliding_with_gate(x, y)
+            if (not IsObstacle) and (not IsCollidingWithGate):
                 wp.append((x,y,1))
             
         return wp
     
+    def check_if_point_colliding_with_gate(self, PointX, PointY) :
+        GatesInfo = self.GateList
+        for i in GatesInfo :
+            CenterCoorListX = [i.entry[0], i.exit[0], i.entry2[0], i.exit2[0]]
+            CenterCoorListY = [i.entry[1], i.exit[1], i.entry2[1], i.exit2[1]]
+            MinX = min(CenterCoorListX)
+            MaxX = max(CenterCoorListX)
+            MinY = min(CenterCoorListY)
+            MaxY = max(CenterCoorListY)
+            if (PointX >= MinX and PointX <= MaxX and PointY >= MinY and PointY <= MaxY):
+                return True
+
+        return False
+
+
+
+
     def planning(self, use_firmware, initial_info):
         """Trajectory planning algorithm"""
         #########################
@@ -268,7 +286,7 @@ class Controller():
         delta = 0.5
         num_waypoints = 5
         WP = []
-        GateList = []
+        self.GateList = []
         path = []
 
         self.ObstList = self.obstacle_list(self.NOMINAL_OBSTACLES, self.NOMINAL_GATES)   
@@ -278,7 +296,7 @@ class Controller():
                 WP = WP + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], 0.06)  
 
         for i in self.NOMINAL_GATES :
-            GateList.append(Gate(i[0],i[1], i[2], i[5], delta))
+            self.GateList.append(Gate(i[0],i[1], i[2], i[5], delta))
 
         
         for j in range(len(self.NOMINAL_GATES)):
@@ -287,7 +305,7 @@ class Controller():
                 source_x = self.initial_obs[0]
                 source_y = self.initial_obs[2]
                 
-            dest = GateList[j].calc_sequence(source_x , source_y)
+            dest = self.GateList[j].calc_sequence(source_x , source_y)
 
             wp = self.generate_points([source_x, source_y], dest[0], num_waypoints, self.ObstList)
 
@@ -299,7 +317,8 @@ class Controller():
                 WP.append((dest[i][0],dest[i][1],1))
 
             WP = WP + nwp
-            path = path + self.astar((source_x,source_y, 1), (dest[1][0],dest[1][1],1), all_coords=WP)
+            path = path + self.astar((source_x,source_y, 1), (dest[0][0],dest[0][1],1), all_coords=WP)
+            path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
             path = path + self.astar((dest[1][0],dest[1][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
             
             source_x = dest[2][0]
