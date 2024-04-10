@@ -46,6 +46,7 @@ except ImportError:
 from gate import Gate
 import random
 import heapq
+from scipy.interpolate import CubicSpline
 try:
     import example_custom_utils as ecu
 except ImportError:
@@ -141,7 +142,7 @@ class Controller():
 
     def check_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R) :
         Dist = math.sqrt((PointX - ObstacleX)**2 + (PointY - ObstacleY)**2)
-        if Dist > R + 0.5 :
+        if Dist > R + 0.12 :
             return False
         return True
     
@@ -241,7 +242,7 @@ class Controller():
         return None  # No path found
 
 
-    def generate_points(self, point1, point2, num_waypoints, ObstacleList):
+    def generate_points(self, point1, point2, num_waypoints, ObstacleList, IsGateCheckEnabled):
         
         wp =[]
         for n in range(num_waypoints):
@@ -255,8 +256,12 @@ class Controller():
                         IsObstacle = True
                         break
             IsCollidingWithGate = self.check_if_point_colliding_with_gate(x, y)
-            if (not IsObstacle) and (not IsCollidingWithGate):
-                wp.append((x,y,1))
+            if IsGateCheckEnabled :
+                if (not IsObstacle) and (not IsCollidingWithGate):
+                    wp.append((x,y,1))
+            else :
+                if (not IsObstacle) :
+                    wp.append((x,y,1))
             
         return wp
     
@@ -284,7 +289,7 @@ class Controller():
         #########################
         ## generate waypoints for planning
         delta = 0.5
-        num_waypoints = 5
+        num_waypoints = 10
         WP = []
         self.GateList = []
         path = []
@@ -307,24 +312,26 @@ class Controller():
                 
             dest = self.GateList[j].calc_sequence(source_x , source_y)
 
-            wp = self.generate_points([source_x, source_y], dest[0], num_waypoints, self.ObstList)
+            wp = self.generate_points([source_x, source_y], dest[0], num_waypoints, self.ObstList, True)
 
             WP = WP + wp
 
-            nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList)
+            # nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
 
-            for i in range(5):
+            # WP = WP + nwp
+            for i in range(3):
                 WP.append((dest[i][0],dest[i][1],1))
 
-            WP = WP + nwp
+            
             path = path + self.astar((source_x,source_y, 1), (dest[0][0],dest[0][1],1), all_coords=WP)
+            # path = path + nwp
             path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
             path = path + self.astar((dest[1][0],dest[1][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
             
             source_x = dest[2][0]
             source_y = dest[2][1]    
 
-
+        path = path + self.astar((source_x,source_y,1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
         self.waypoints = np.array(path)
         # Call a function in module `example_custom_utils`.
         ecu.exampleFunction()
@@ -349,14 +356,24 @@ class Controller():
         deg = 12
         t = np.arange(self.waypoints.shape[0])
         # print("t",t)
-        fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
-        fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
-        fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
-        duration = 15
-        t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
-        self.ref_x = fx(t_scaled)
-        self.ref_y = fy(t_scaled)
-        self.ref_z = fz(t_scaled)
+        # fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
+        # fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
+        # fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
+        duration = 10
+        # t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
+        # self.ref_x = fx(t_scaled)
+        # self.ref_y = fy(t_scaled)
+        # self.ref_z = fz(t_scaled)
+
+        spline_x = CubicSpline(t, self.waypoints[:, 0])
+        spline_y = CubicSpline(t, self.waypoints[:, 1])
+        spline_z = CubicSpline(t, self.waypoints[:, 2])
+
+        # Interpolate along the splines to get the reference trajectory
+        t_scaled = np.linspace(t[0], t[-1], int(duration * self.CTRL_FREQ))
+        self.ref_x = spline_x(t_scaled)
+        self.ref_y = spline_y(t_scaled)
+        self.ref_z = spline_z(t_scaled)
 
         #########################
         # REPLACE THIS (END) ####
