@@ -10,13 +10,13 @@ class Gate() :
         if self.phi != 0 :
             self.entry = [self.x + delta, self.y]
             self.exit = [self.x - delta, self.y]
-            self.entry2 = [self.x, self.y + delta]
-            self.exit2 = [self.x, self.y - delta]
+            self.entry2 = [self.x, self.y + 1.5*delta]
+            self.exit2 = [self.x, self.y - 1.5*delta]
         else :
             self.entry = [self.x, self.y + delta]
             self.exit = [self.x, self.y - delta]
-            self.entry2 = [self.x + delta, self.y]
-            self.exit2 = [self.x - delta, self.y]
+            self.entry2 = [self.x + 1.5*delta, self.y]
+            self.exit2 = [self.x - 1.5*delta, self.y]
     def calc_sequence(self, SourceX, SourceY) :
         Dist1 = math.sqrt((self.entry[0] - SourceX)**2 + (self.entry[1] - SourceY)**2)
         Dist2 = math.sqrt((self.exit[0] - SourceX)**2 + (self.exit[1] - SourceY)**2)

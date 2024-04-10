@@ -35,7 +35,7 @@ try:
 except ImportError:
     # PyTest import.
     from .project_utils import Command, PIDController, timing_step, timing_ep, plot_trajectory, draw_trajectory
-
+GlobalR = 0.46
 #########################
 # REPLACE THIS (START) ##
 #########################
@@ -131,18 +131,18 @@ class Controller():
             ObstacleList.append([j[0], j[1], j[2], j[5],1])
         return ObstacleList
     
-    # def remove_goal_gate(self, ObstacleList, destination):
-    #     for i in range(len(ObstacleList)) :
-    #         if ObstacleList[i][4] == 1 :
-    #             if ObstacleList[i][0] == destination[0] and ObstacleList[i][1] == destination[1] :
-    #                 ObstacleList.pop(i)
-    #                 break
-    #     return ObstacleList
+    def remove_goal_gate(self, ObstacleList, destination):
+        for i in range(len(ObstacleList)) :
+            if ObstacleList[i][4] == 1 :
+                if ObstacleList[i][0] == destination[0] and ObstacleList[i][1] == destination[1] :
+                    ObstacleList.pop(i)
+                    break
+        return ObstacleList
 
 
     def check_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R) :
         Dist = math.sqrt((PointX - ObstacleX)**2 + (PointY - ObstacleY)**2)
-        if Dist > R + 0.12 :
+        if Dist > R:
             return False
         return True
     
@@ -157,7 +157,7 @@ class Controller():
         return points
     
     def create_peripheral_coordinates_around_obstcl(self, ObstacleX, ObstacleY, R) :
-        return self.points_on_circumference((ObstacleX, ObstacleY), R + 0.3, 8)
+        return self.points_on_circumference((ObstacleX, ObstacleY), R, 50)
 
     
     # def remove_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R, prevCoorX, prevCoorY) :
@@ -187,20 +187,26 @@ class Controller():
 
     def generate_neighbors(self, current_coord, all_coords, distance_threshold):
         neighbors = []
+        IsGateCenter = False
+        IsCurrCoorOnCircle = current_coord in self.CircleCoord
+        GateVar = -1
+        for i in range(4):
+            if current_coord[0] == self.GateList[i].x and current_coord[1] == self.GateList[i].y:
+                IsGateCenter = True
+                GateVar = self.GateList[i]
+                break
         # print(current_coord)
         for coord in all_coords:
-            ifFlag = False
-            # print(coord)
-            # half = (np.array(current_coord) + np.array(coord))/2
-            half = ((current_coord[0] + coord[0])/2, (current_coord[1] + coord[1])/2, (current_coord[2] + coord[2])/2)
-            if self.euclidean_distance(current_coord, coord) <= distance_threshold:
-                for o in self.ObstList:
-                    if o[4] == 0:
-                        if self.check_obstacle(half[0], half[1], o[0], o[1], 0.06) :
-                            ifFlag = True
-                            break
-                if not ifFlag :
-                    neighbors.append(coord)
+            CurrDist = self.euclidean_distance(current_coord, coord)
+            if CurrDist <= distance_threshold:
+                pts = self.generate_points(current_coord, coord, 30, self.ObstList, False)
+                ClashCond = IsGateCenter and ((coord[0] == GateVar.entry2[0] and coord[1] == GateVar.entry2[1]) or (coord[0] == GateVar.exit2[0] and coord[1] == GateVar.exit2[1]))
+                isCoordOnCircle = coord in self.CircleCoord
+                IsDistanceOptimal = CurrDist < GlobalR
+                if len(pts) < 20 or ClashCond or (IsCurrCoorOnCircle and isCoordOnCircle and IsDistanceOptimal):
+                    continue
+                neighbors.append(coord)
+    
         return neighbors
     
     def reconstruct_path(self, came_from, current):
@@ -227,7 +233,7 @@ class Controller():
 
             closed_set.add(current)
 
-            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=1.5):
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=0.75):
                 if neighbor in closed_set:
                     continue
 
@@ -252,7 +258,7 @@ class Controller():
             IsObstacle = False
             for o in ObstacleList:
                 if o[4] == 0:
-                    if self.check_obstacle(x,y,o[0],o[1],0.06) :
+                    if self.check_obstacle(x,y,o[0],o[1],GlobalR) :
                         IsObstacle = True
                         break
             IsCollidingWithGate = self.check_if_point_colliding_with_gate(x, y)
@@ -289,16 +295,17 @@ class Controller():
         #########################
         ## generate waypoints for planning
         delta = 0.5
-        num_waypoints = 10
+        num_waypoints = 50
         WP = []
         self.GateList = []
         path = []
 
         self.ObstList = self.obstacle_list(self.NOMINAL_OBSTACLES, self.NOMINAL_GATES)   
-
+        self.CircleCoord = []
         for o in self.ObstList:
             if o[4] == 0:
-                WP = WP + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], 0.06)  
+                WP = WP + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], GlobalR)
+                self.CircleCoord = self.CircleCoord + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], GlobalR)
 
         for i in self.NOMINAL_GATES :
             self.GateList.append(Gate(i[0],i[1], i[2], i[5], delta))
@@ -316,10 +323,10 @@ class Controller():
 
             WP = WP + wp
 
-            # nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
+            nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
 
-            # WP = WP + nwp
-            for i in range(3):
+            WP = WP + nwp
+            for i in range(5):
                 WP.append((dest[i][0],dest[i][1],1))
 
             
@@ -359,7 +366,7 @@ class Controller():
         # fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
         # fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
         # fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
-        duration = 10
+        duration = 15
         # t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
         # self.ref_x = fx(t_scaled)
         # self.ref_y = fy(t_scaled)
