@@ -233,7 +233,7 @@ class Controller():
 
             closed_set.add(current)
 
-            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=1):
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=2.5):
                 if neighbor in closed_set:
                     continue
 
@@ -392,7 +392,7 @@ class Controller():
         # fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
         # fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
         # fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
-        duration = 15
+        duration = 20
         # t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
         # self.ref_x = fx(t_scaled)
         # self.ref_y = fy(t_scaled)
@@ -463,7 +463,7 @@ class Controller():
             args = [height, duration]
 
         # [INSTRUCTIONS] Example code for using cmdFullState interface   
-        elif iteration >= 3*self.CTRL_FREQ and iteration < 20*self.CTRL_FREQ:
+        elif iteration >= 3*self.CTRL_FREQ and iteration < 30*self.CTRL_FREQ:
             step = min(iteration-3*self.CTRL_FREQ, len(self.ref_x) -1)
             target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
             target_vel = np.zeros(3)
@@ -474,12 +474,12 @@ class Controller():
             command_type = Command(1)  # cmdFullState.
             args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates]
 
-        elif iteration == 20*self.CTRL_FREQ:
+        elif iteration == 30*self.CTRL_FREQ:
             command_type = Command(6)  # Notify setpoint stop.
             args = []
 
        # [INSTRUCTIONS] Example code for using goTo interface 
-        elif iteration == 20*self.CTRL_FREQ+1:
+        elif iteration == 30*self.CTRL_FREQ+1:
             x = self.ref_x[-1]
             y = self.ref_y[-1]
             z = 1.5 
@@ -489,7 +489,7 @@ class Controller():
             command_type = Command(5)  # goTo.
             args = [[x, y, z], yaw, duration, False]
 
-        elif iteration == 23*self.CTRL_FREQ:
+        elif iteration == 33*self.CTRL_FREQ:
             x = self.initial_obs[0]
             y = self.initial_obs[2]
             z = 1.5
@@ -499,7 +499,7 @@ class Controller():
             command_type = Command(5)  # goTo.
             args = [[x, y, z], yaw, duration, False]
 
-        elif iteration == 30*self.CTRL_FREQ:
+        elif iteration == 40*self.CTRL_FREQ:
             height = 0.
             duration = 3
 
