@@ -199,11 +199,11 @@ class Controller():
         for coord in all_coords:
             CurrDist = self.euclidean_distance(current_coord, coord)
             if CurrDist <= distance_threshold:
-                pts = self.generate_points(current_coord, coord, 30, self.ObstList, False)
+                pts = self.generate_points(current_coord, coord, 30, self.ObstList, True)
                 ClashCond = IsGateCenter and ((coord[0] == GateVar.entry2[0] and coord[1] == GateVar.entry2[1]) or (coord[0] == GateVar.exit2[0] and coord[1] == GateVar.exit2[1]))
                 isCoordOnCircle = coord in self.CircleCoord
                 IsDistanceOptimal = CurrDist < GlobalR
-                if len(pts) < 20 or ClashCond or (IsCurrCoorOnCircle and isCoordOnCircle and IsDistanceOptimal):
+                if len(pts) < 30 or ClashCond or (IsCurrCoorOnCircle and isCoordOnCircle and IsDistanceOptimal):
                     continue
                 neighbors.append(coord)
     
@@ -274,13 +274,11 @@ class Controller():
     def check_if_point_colliding_with_gate(self, PointX, PointY) :
         GatesInfo = self.GateList
         for i in GatesInfo :
-            CenterCoorListX = [i.entry[0], i.exit[0], i.entry2[0], i.exit2[0]]
-            CenterCoorListY = [i.entry[1], i.exit[1], i.entry2[1], i.exit2[1]]
-            MinX = min(CenterCoorListX)
-            MaxX = max(CenterCoorListX)
-            MinY = min(CenterCoorListY)
-            MaxY = max(CenterCoorListY)
-            if (PointX >= MinX and PointX <= MaxX and PointY >= MinY and PointY <= MaxY):
+            Obs1 = i.obs_1
+            Obs2 = i.obs_2
+            Dist1 = math.sqrt((Obs1[0]-PointX)**2 + (Obs1[1]-PointY)**2)
+            Dist2 = math.sqrt((Obs2[0]-PointX)**2 + (Obs2[1]-PointY)**2)
+            if Dist1 <0.18 or Dist2 <0.18 :
                 return True
 
         return False
@@ -338,35 +336,35 @@ class Controller():
             source_x = dest[2][0]
             source_y = dest[2][1]    
 
-        # Calculate the Euclidean distance between two points
-        def distance(x1, y1, x2, y2):
-            return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+        # # Calculate the Euclidean distance between two points
+        # def distance(x1, y1, x2, y2):
+        #     return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
 
         # Initialize the closest points
-        closest_entry = None
-        closest_distance = float('inf')
+        # closest_entry = None
+        # closest_distance = float('inf')
 
         # Iterate over the entries
-        for i in (self.GateList):
-            entry_x = i.entry[0]
-            entry_y = i.entry[1]
-            reference_x = initial_info["x_reference"][0]
-            reference_y = initial_info["x_reference"][1]
+        # for i in (self.GateList):
+        #     entry_x = i.entry[0]
+        #     entry_y = i.entry[1]
+        #     reference_x = initial_info["x_reference"][0]
+        #     reference_y = initial_info["x_reference"][1]
 
-            # Calculate the distance between the entry and the reference point
-            dist = distance(entry_x, entry_y, reference_x, reference_y)
+        #     # Calculate the distance between the entry and the reference point
+        #     dist = distance(entry_x, entry_y, reference_x, reference_y)
 
-            # Update the closest points if a closer entry is found
-            if dist < closest_distance:
-                closest_gate = i
-                closest_distance = dist
+        #     # Update the closest points if a closer entry is found
+        #     if dist < closest_distance:
+        #         closest_gate = i
+        #         closest_distance = dist
 
         # closest_entry is the entry closest to the reference point
         # print("Closest entry:", closest_entry)  
-        dest1 = closest_gate.calc_sequence(source_x , source_y)
+        # dest1 = closest_gate.calc_sequence(source_x , source_y)
 
-        path = path + self.astar((source_x,source_y, 1), (dest1[0][0],dest1[0][1],1), all_coords=WP)
-        path = path + self.astar((dest1[0][0],dest1[0][1],1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
+        # path = path + self.astar((source_x,source_y, 1), (dest1[0][0],dest1[0][1],1), all_coords=WP)
+        path = path + self.astar((source_x,source_y, 1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
         self.waypoints = np.array(path)
         # Call a function in module `example_custom_utils`.
         ecu.exampleFunction()
