@@ -233,7 +233,7 @@ class Controller():
 
             closed_set.add(current)
 
-            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=0.75):
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=1):
                 if neighbor in closed_set:
                     continue
 
@@ -338,7 +338,35 @@ class Controller():
             source_x = dest[2][0]
             source_y = dest[2][1]    
 
-        path = path + self.astar((source_x,source_y,1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
+        # Calculate the Euclidean distance between two points
+        def distance(x1, y1, x2, y2):
+            return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+
+        # Initialize the closest points
+        closest_entry = None
+        closest_distance = float('inf')
+
+        # Iterate over the entries
+        for i in (self.GateList):
+            entry_x = i.entry[0]
+            entry_y = i.entry[1]
+            reference_x = initial_info["x_reference"][0]
+            reference_y = initial_info["x_reference"][1]
+
+            # Calculate the distance between the entry and the reference point
+            dist = distance(entry_x, entry_y, reference_x, reference_y)
+
+            # Update the closest points if a closer entry is found
+            if dist < closest_distance:
+                closest_gate = i
+                closest_distance = dist
+
+        # closest_entry is the entry closest to the reference point
+        # print("Closest entry:", closest_entry)  
+        dest1 = closest_gate.calc_sequence(source_x , source_y)
+
+        path = path + self.astar((source_x,source_y, 1), (dest1[0][0],dest1[0][1],1), all_coords=WP)
+        path = path + self.astar((dest1[0][0],dest1[0][1],1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
         self.waypoints = np.array(path)
         # Call a function in module `example_custom_utils`.
         ecu.exampleFunction()
