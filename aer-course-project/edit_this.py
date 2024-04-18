@@ -35,7 +35,7 @@ try:
 except ImportError:
     # PyTest import.
     from .project_utils import Command, PIDController, timing_step, timing_ep, plot_trajectory, draw_trajectory
-GlobalR = 0.46
+GlobalR = 0.3
 #########################
 # REPLACE THIS (START) ##
 #########################
@@ -233,7 +233,7 @@ class Controller():
 
             closed_set.add(current)
 
-            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=2.5):
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=10):
                 if neighbor in closed_set:
                     continue
 
@@ -293,11 +293,12 @@ class Controller():
         #########################
         ## generate waypoints for planning
         delta = 0.5
-        num_waypoints = 50
+        num_waypoints = 10
         WP = []
         self.GateList = []
         path = []
-
+        newOrd = [self.NOMINAL_GATES[0], self.NOMINAL_GATES[2], self.NOMINAL_GATES[1], self.NOMINAL_GATES[3]]
+        self.NOMINAL_GATES = newOrd
         self.ObstList = self.obstacle_list(self.NOMINAL_OBSTACLES, self.NOMINAL_GATES)   
         self.CircleCoord = []
         for o in self.ObstList:
@@ -321,17 +322,17 @@ class Controller():
 
             WP = WP + wp
 
-            nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
+            # nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
 
-            WP = WP + nwp
+            # WP = WP + nwp
             for i in range(5):
                 WP.append((dest[i][0],dest[i][1],1))
 
             
             path = path + self.astar((source_x,source_y, 1), (dest[0][0],dest[0][1],1), all_coords=WP)
             # path = path + nwp
-            path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
-            path = path + self.astar((dest[1][0],dest[1][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
+            # path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
+            path = path + self.astar((dest[0][0],dest[0][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
             
             source_x = dest[2][0]
             source_y = dest[2][1]    
@@ -364,7 +365,7 @@ class Controller():
         # dest1 = closest_gate.calc_sequence(source_x , source_y)
 
         # path = path + self.astar((source_x,source_y, 1), (dest1[0][0],dest1[0][1],1), all_coords=WP)
-        path = path + self.astar((source_x,source_y, 1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
+        # path = path + self.astar((source_x,source_y, 1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
         self.waypoints = np.array(path)
         # Call a function in module `example_custom_utils`.
         ecu.exampleFunction()
@@ -387,20 +388,21 @@ class Controller():
         # Polynomial fit.
         # self.waypoints = np.array(waypoints)
         deg = 12
+        from scipy.interpolate import UnivariateSpline
         t = np.arange(self.waypoints.shape[0])
         # print("t",t)
         # fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
         # fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
         # fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
-        duration = 20
+        duration = 28
         # t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
         # self.ref_x = fx(t_scaled)
         # self.ref_y = fy(t_scaled)
         # self.ref_z = fz(t_scaled)
-
-        spline_x = CubicSpline(t, self.waypoints[:, 0])
-        spline_y = CubicSpline(t, self.waypoints[:, 1])
-        spline_z = CubicSpline(t, self.waypoints[:, 2])
+        from scipy.interpolate import interp1d
+        spline_x = interp1d(t, self.waypoints[:, 0], kind='linear')
+        spline_y = interp1d(t, self.waypoints[:, 1], kind='linear')
+        spline_z = interp1d(t, self.waypoints[:, 2], kind='linear')
 
         # Interpolate along the splines to get the reference trajectory
         t_scaled = np.linspace(t[0], t[-1], int(duration * self.CTRL_FREQ))
@@ -463,7 +465,7 @@ class Controller():
             args = [height, duration]
 
         # [INSTRUCTIONS] Example code for using cmdFullState interface   
-        elif iteration >= 3*self.CTRL_FREQ and iteration < 30*self.CTRL_FREQ:
+        elif iteration >= 3*self.CTRL_FREQ and iteration < 35*self.CTRL_FREQ:
             step = min(iteration-3*self.CTRL_FREQ, len(self.ref_x) -1)
             target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
             target_vel = np.zeros(3)
@@ -474,39 +476,39 @@ class Controller():
             command_type = Command(1)  # cmdFullState.
             args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates]
 
-        elif iteration == 30*self.CTRL_FREQ:
+        elif iteration == 35*self.CTRL_FREQ:
             command_type = Command(6)  # Notify setpoint stop.
             args = []
 
        # [INSTRUCTIONS] Example code for using goTo interface 
-        elif iteration == 30*self.CTRL_FREQ+1:
-            x = self.ref_x[-1]
-            y = self.ref_y[-1]
-            z = 1.5 
-            yaw = 0.
-            duration = 2.5
+        # elif iteration == 30*self.CTRL_FREQ+1:
+        #     x = self.ref_x[-1]
+        #     y = self.ref_y[-1]
+        #     z = 1.5 
+        #     yaw = 0.
+        #     duration = 2.5
 
-            command_type = Command(5)  # goTo.
-            args = [[x, y, z], yaw, duration, False]
+        #     command_type = Command(5)  # goTo.
+        #     args = [[x, y, z], yaw, duration, False]
 
-        elif iteration == 33*self.CTRL_FREQ:
-            x = self.initial_obs[0]
-            y = self.initial_obs[2]
-            z = 1.5
-            yaw = 0.
-            duration = 6
+        # elif iteration == 33*self.CTRL_FREQ:
+        #     x = self.initial_obs[0]
+        #     y = self.initial_obs[2]
+        #     z = 1.5
+        #     yaw = 0.
+        #     duration = 6
 
-            command_type = Command(5)  # goTo.
-            args = [[x, y, z], yaw, duration, False]
+        #     command_type = Command(5)  # goTo.
+        #     args = [[x, y, z], yaw, duration, False]
 
-        elif iteration == 40*self.CTRL_FREQ:
+        elif iteration == 37*self.CTRL_FREQ:
             height = 0.
             duration = 3
 
             command_type = Command(3)  # Land.
             args = [height, duration]
 
-        elif iteration == 33*self.CTRL_FREQ-1:
+        elif iteration == 40*self.CTRL_FREQ-1:
             command_type = Command(4)  # STOP command to be sent once the trajectory is completed.
             args = []
 
