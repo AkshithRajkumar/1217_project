@@ -297,8 +297,8 @@ class Controller():
         WP = []
         self.GateList = []
         path = []
-        newOrd = [self.NOMINAL_GATES[0], self.NOMINAL_GATES[2], self.NOMINAL_GATES[1], self.NOMINAL_GATES[3]]
-        self.NOMINAL_GATES = newOrd
+        # newOrd = [self.NOMINAL_GATES[0], self.NOMINAL_GATES[2], self.NOMINAL_GATES[1], self.NOMINAL_GATES[3]]
+        # self.NOMINAL_GATES = newOrd
         self.ObstList = self.obstacle_list(self.NOMINAL_OBSTACLES, self.NOMINAL_GATES)   
         self.CircleCoord = []
         for o in self.ObstList:
@@ -325,14 +325,14 @@ class Controller():
             # nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
 
             # WP = WP + nwp
-            for i in range(5):
+            for i in range(7):
                 WP.append((dest[i][0],dest[i][1],1))
 
             
             path = path + self.astar((source_x,source_y, 1), (dest[0][0],dest[0][1],1), all_coords=WP)
             # path = path + nwp
-            # path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
-            path = path + self.astar((dest[0][0],dest[0][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
+            path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
+            path = path + self.astar((dest[1][0],dest[1][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
             
             source_x = dest[2][0]
             source_y = dest[2][1]    
@@ -387,14 +387,14 @@ class Controller():
 
         # Polynomial fit.
         # self.waypoints = np.array(waypoints)
-        deg = 12
+        deg = 8
         from scipy.interpolate import UnivariateSpline
         t = np.arange(self.waypoints.shape[0])
         # print("t",t)
         # fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
         # fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
         # fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
-        duration = 28
+        duration = 20
         # t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
         # self.ref_x = fx(t_scaled)
         # self.ref_y = fy(t_scaled)
@@ -480,7 +480,7 @@ class Controller():
             command_type = Command(6)  # Notify setpoint stop.
             args = []
 
-       # [INSTRUCTIONS] Example code for using goTo interface 
+       # [INSTRUCTIONS] Example code for using goTo interface
         # elif iteration == 30*self.CTRL_FREQ+1:
         #     x = self.ref_x[-1]
         #     y = self.ref_y[-1]
@@ -508,7 +508,7 @@ class Controller():
             command_type = Command(3)  # Land.
             args = [height, duration]
 
-        elif iteration == 40*self.CTRL_FREQ-1:
+        elif iteration == 45*self.CTRL_FREQ-1:
             command_type = Command(4)  # STOP command to be sent once the trajectory is completed.
             args = []
 
