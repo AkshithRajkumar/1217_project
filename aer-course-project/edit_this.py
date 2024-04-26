@@ -29,13 +29,13 @@ Tips:
 import numpy as np
 import math
 from collections import deque
-
+from scipy.interpolate import interp1d
 try:
     from project_utils import Command, PIDController, timing_step, timing_ep, plot_trajectory, draw_trajectory
 except ImportError:
     # PyTest import.
     from .project_utils import Command, PIDController, timing_step, timing_ep, plot_trajectory, draw_trajectory
-GlobalR = 0.3
+GlobalR = 0.45
 #########################
 # REPLACE THIS (START) ##
 #########################
@@ -159,27 +159,6 @@ class Controller():
     def create_peripheral_coordinates_around_obstcl(self, ObstacleX, ObstacleY, R) :
         return self.points_on_circumference((ObstacleX, ObstacleY), R, 50)
 
-    
-    # def remove_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R, prevCoorX, prevCoorY) :
-    #     Point1 = [PointX + R, PointY]
-    #     Point2 = [PointX - R, PointY]
-    #     Point3 = [PointX, PointY + R]
-    #     Point4 = [PointX, PointY - R]
-
-    #     Dist1 = math.sqrt((Point1[0] - prevCoorX)**2 + (Point1[1] - prevCoorY)**2)
-    #     Dist2 = math.sqrt((Point3[0] - prevCoorX)**2 + (Point3[1] - prevCoorY)**2)
-
-    #     if Dist1 < Dist2 :
-    #         if self.check_obstacle(Point1[0], Point1[1], ObstacleX, ObstacleY, R) :
-    #             return Point1
-    #         else :
-    #             return Point2
-    #     else :
-    #         if self.check_obstacle(Point3[0], Point3[1], ObstacleX, ObstacleY, R) :
-    #             return Point3
-    #         else :
-    #             return Point4
-
     def euclidean_distance(self, coord1, coord2):
         x1, y1, z1 = coord1
         x2, y2, z2 = coord2
@@ -233,7 +212,7 @@ class Controller():
 
             closed_set.add(current)
 
-            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=10):
+            for neighbor in self.generate_neighbors(current, all_coords, distance_threshold=1.5):
                 if neighbor in closed_set:
                     continue
 
@@ -284,8 +263,6 @@ class Controller():
         return False
 
 
-
-
     def planning(self, use_firmware, initial_info):
         """Trajectory planning algorithm"""
         #########################
@@ -297,8 +274,8 @@ class Controller():
         WP = []
         self.GateList = []
         path = []
-        # newOrd = [self.NOMINAL_GATES[0], self.NOMINAL_GATES[2], self.NOMINAL_GATES[1], self.NOMINAL_GATES[3]]
-        # self.NOMINAL_GATES = newOrd
+        newOrd = [self.NOMINAL_GATES[0], self.NOMINAL_GATES[2], self.NOMINAL_GATES[3], self.NOMINAL_GATES[1],self.NOMINAL_GATES[0],self.NOMINAL_GATES[3]]
+        self.NOMINAL_GATES = newOrd
         self.ObstList = self.obstacle_list(self.NOMINAL_OBSTACLES, self.NOMINAL_GATES)   
         self.CircleCoord = []
         for o in self.ObstList:
@@ -307,7 +284,14 @@ class Controller():
                 self.CircleCoord = self.CircleCoord + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], GlobalR)
 
         for i in self.NOMINAL_GATES :
-            self.GateList.append(Gate(i[0],i[1], i[2], i[5], delta))
+            if i == self.NOMINAL_GATES[1] :
+                self.GateList.append(Gate(i[0],i[1] - 0.07, i[2], i[5], delta))
+            elif i == self.NOMINAL_GATES[4] :
+                self.GateList.append(Gate(i[0] ,i[1]+ 0.07, i[2], i[5], delta))    
+            elif i == self.NOMINAL_GATES[3] :
+                self.GateList.append(Gate(i[0] - 0.07 ,i[1], i[2], i[5], delta))
+            else :
+                self.GateList.append(Gate(i[0],i[1], i[2], i[5], delta))
 
         
         for j in range(len(self.NOMINAL_GATES)):
@@ -322,84 +306,26 @@ class Controller():
 
             WP = WP + wp
 
-            # nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
-
-            # WP = WP + nwp
-            for i in range(7):
+            for i in range(5):
                 WP.append((dest[i][0],dest[i][1],1))
 
             
             path = path + self.astar((source_x,source_y, 1), (dest[0][0],dest[0][1],1), all_coords=WP)
-            # path = path + nwp
             path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
             path = path + self.astar((dest[1][0],dest[1][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
             
             source_x = dest[2][0]
             source_y = dest[2][1]    
 
-        # # Calculate the Euclidean distance between two points
-        # def distance(x1, y1, x2, y2):
-        #     return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-
-        # Initialize the closest points
-        # closest_entry = None
-        # closest_distance = float('inf')
-
-        # Iterate over the entries
-        # for i in (self.GateList):
-        #     entry_x = i.entry[0]
-        #     entry_y = i.entry[1]
-        #     reference_x = initial_info["x_reference"][0]
-        #     reference_y = initial_info["x_reference"][1]
-
-        #     # Calculate the distance between the entry and the reference point
-        #     dist = distance(entry_x, entry_y, reference_x, reference_y)
-
-        #     # Update the closest points if a closer entry is found
-        #     if dist < closest_distance:
-        #         closest_gate = i
-        #         closest_distance = dist
-
-        # closest_entry is the entry closest to the reference point
-        # print("Closest entry:", closest_entry)  
-        # dest1 = closest_gate.calc_sequence(source_x , source_y)
-
-        # path = path + self.astar((source_x,source_y, 1), (dest1[0][0],dest1[0][1],1), all_coords=WP)
-        # path = path + self.astar((source_x,source_y, 1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
         self.waypoints = np.array(path)
         # Call a function in module `example_custom_utils`.
         ecu.exampleFunction()
 
-        # initial waypoint
-        # if use_firmware:
-        #     waypoints = [(self.initial_obs[0], self.initial_obs[2], initial_info["gate_dimensions"]["tall"]["height"])]  # Height is hardcoded scenario knowledge.
-        # else:
-        #     waypoints = [(self.initial_obs[0], self.initial_obs[2], self.initial_obs[4])]
-
-        # # Example code: hardcode waypoints 
-        # waypoints.append((-0.5, -3.0, 2.0))
-        # waypoints.append((-0.5, -2.0, 2.0))
-        # waypoints.append((-0.5, -1.0, 2.0))
-        # waypoints.append((-0.5,  0.0, 2.0))
-        # waypoints.append((-0.5,  1.0, 2.0))
-        # waypoints.append((-0.5,  2.0, 2.0))
-        # waypoints.append([initial_info["x_reference"][0], initial_info["x_reference"][2], initial_info["x_reference"][4]])
-
-        # Polynomial fit.
-        # self.waypoints = np.array(waypoints)
-        deg = 8
-        from scipy.interpolate import UnivariateSpline
         t = np.arange(self.waypoints.shape[0])
-        # print("t",t)
-        # fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
-        # fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
-        # fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
-        duration = 20
-        # t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
-        # self.ref_x = fx(t_scaled)
-        # self.ref_y = fy(t_scaled)
-        # self.ref_z = fz(t_scaled)
-        from scipy.interpolate import interp1d
+        
+        duration = 25
+        
+        
         spline_x = interp1d(t, self.waypoints[:, 0], kind='linear')
         spline_y = interp1d(t, self.waypoints[:, 1], kind='linear')
         spline_z = interp1d(t, self.waypoints[:, 2], kind='linear')
@@ -465,7 +391,7 @@ class Controller():
             args = [height, duration]
 
         # [INSTRUCTIONS] Example code for using cmdFullState interface   
-        elif iteration >= 3*self.CTRL_FREQ and iteration < 35*self.CTRL_FREQ:
+        elif iteration >= 3*self.CTRL_FREQ and iteration < 40*self.CTRL_FREQ:
             step = min(iteration-3*self.CTRL_FREQ, len(self.ref_x) -1)
             target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
             target_vel = np.zeros(3)
@@ -476,39 +402,18 @@ class Controller():
             command_type = Command(1)  # cmdFullState.
             args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates]
 
-        elif iteration == 35*self.CTRL_FREQ:
+        elif iteration == 42*self.CTRL_FREQ:
             command_type = Command(6)  # Notify setpoint stop.
             args = []
 
-       # [INSTRUCTIONS] Example code for using goTo interface
-        # elif iteration == 30*self.CTRL_FREQ+1:
-        #     x = self.ref_x[-1]
-        #     y = self.ref_y[-1]
-        #     z = 1.5 
-        #     yaw = 0.
-        #     duration = 2.5
-
-        #     command_type = Command(5)  # goTo.
-        #     args = [[x, y, z], yaw, duration, False]
-
-        # elif iteration == 33*self.CTRL_FREQ:
-        #     x = self.initial_obs[0]
-        #     y = self.initial_obs[2]
-        #     z = 1.5
-        #     yaw = 0.
-        #     duration = 6
-
-        #     command_type = Command(5)  # goTo.
-        #     args = [[x, y, z], yaw, duration, False]
-
-        elif iteration == 37*self.CTRL_FREQ:
+        elif iteration == 44*self.CTRL_FREQ:
             height = 0.
-            duration = 3
+            duration = 7
 
             command_type = Command(3)  # Land.
             args = [height, duration]
 
-        elif iteration == 45*self.CTRL_FREQ-1:
+        elif iteration == 55*self.CTRL_FREQ-1:
             command_type = Command(4)  # STOP command to be sent once the trajectory is completed.
             args = []
 
