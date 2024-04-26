@@ -160,25 +160,7 @@ class Controller():
         return self.points_on_circumference((ObstacleX, ObstacleY), R, 50)
 
     
-    # def remove_obstacle(self, PointX, PointY, ObstacleX, ObstacleY, R, prevCoorX, prevCoorY) :
-    #     Point1 = [PointX + R, PointY]
-    #     Point2 = [PointX - R, PointY]
-    #     Point3 = [PointX, PointY + R]
-    #     Point4 = [PointX, PointY - R]
 
-    #     Dist1 = math.sqrt((Point1[0] - prevCoorX)**2 + (Point1[1] - prevCoorY)**2)
-    #     Dist2 = math.sqrt((Point3[0] - prevCoorX)**2 + (Point3[1] - prevCoorY)**2)
-
-    #     if Dist1 < Dist2 :
-    #         if self.check_obstacle(Point1[0], Point1[1], ObstacleX, ObstacleY, R) :
-    #             return Point1
-    #         else :
-    #             return Point2
-    #     else :
-    #         if self.check_obstacle(Point3[0], Point3[1], ObstacleX, ObstacleY, R) :
-    #             return Point3
-    #         else :
-    #             return Point4
 
     def euclidean_distance(self, coord1, coord2):
         x1, y1, z1 = coord1
@@ -249,27 +231,50 @@ class Controller():
 
 
     def generate_points(self, point1, point2, num_waypoints, ObstacleList, IsGateCheckEnabled):
-        
-        wp =[]
+        """
+        Generate intermediate waypoints between two points while avoiding obstacles.
+
+        Args:
+            point1 (tuple): Coordinates of the starting point (x, y).
+            point2 (tuple): Coordinates of the destination point (x, y).
+            num_waypoints (int): Number of intermediate waypoints to generate.
+            ObstacleList (list): List of obstacles to avoid.
+            IsGateCheckEnabled (bool): Flag indicating whether gate collision check is enabled.
+
+        Returns:
+            list: List of intermediate waypoints.
+        """
+
+        # Initialize empty list to store waypoints
+        wp = []
+
+        # Iterate to generate specified number of waypoints
         for n in range(num_waypoints):
-            ratio = n/(num_waypoints)
-            x = point1[0] + ((point2[0]- point1[0])*ratio)
-            y = point1[1] + ((point2[1]- point1[1])*ratio)
+            ratio = n / (num_waypoints)
+            x = point1[0] + ((point2[0] - point1[0]) * ratio)
+            y = point1[1] + ((point2[1] - point1[1]) * ratio)
+
+            # Check if the generated waypoint collides with any obstacles
             IsObstacle = False
             for o in ObstacleList:
-                if o[4] == 0:
-                    if self.check_obstacle(x,y,o[0],o[1],GlobalR) :
+                if o[4] == 0:  # Check only non-gate obstacles
+                    if self.check_obstacle(x, y, o[0], o[1], GlobalR):
                         IsObstacle = True
                         break
-            IsCollidingWithGate = self.check_if_point_colliding_with_gate(x, y)
-            if IsGateCheckEnabled :
-                if (not IsObstacle) and (not IsCollidingWithGate):
-                    wp.append((x,y,1))
-            else :
-                if (not IsObstacle) :
-                    wp.append((x,y,1))
             
+            # Check if the generated waypoint collides with any gate
+            IsCollidingWithGate = self.check_if_point_colliding_with_gate(x, y)
+
+            # Add waypoint if it is not colliding with any obstacles or gates
+            if IsGateCheckEnabled:
+                if (not IsObstacle) and (not IsCollidingWithGate):
+                    wp.append((x, y, 1))
+            else:
+                if (not IsObstacle):
+                    wp.append((x, y, 1))
+
         return wp
+
     
     def check_if_point_colliding_with_gate(self, PointX, PointY) :
         GatesInfo = self.GateList
@@ -282,23 +287,18 @@ class Controller():
                 return True
 
         return False
-
-
-
-
+    
     def planning(self, use_firmware, initial_info):
         """Trajectory planning algorithm"""
-        #########################
-        # REPLACE THIS (START) ##
-        #########################
-        ## generate waypoints for planning
+
+        # Initialize waypoints list and gate information
         delta = 0.5
         num_waypoints = 10
         WP = []
         self.GateList = []
         path = []
-        # newOrd = [self.NOMINAL_GATES[0], self.NOMINAL_GATES[2], self.NOMINAL_GATES[1], self.NOMINAL_GATES[3]]
-        # self.NOMINAL_GATES = newOrd
+
+        # Generate obstacle list combining gates and obstacles
         self.ObstList = self.obstacle_list(self.NOMINAL_OBSTACLES, self.NOMINAL_GATES)   
         self.CircleCoord = []
         for o in self.ObstList:
@@ -306,115 +306,63 @@ class Controller():
                 WP = WP + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], GlobalR)
                 self.CircleCoord = self.CircleCoord + self.create_peripheral_coordinates_around_obstcl(o[0], o[1], GlobalR)
 
+        # Create gate objects and append to GateList
         for i in self.NOMINAL_GATES :
             self.GateList.append(Gate(i[0],i[1], i[2], i[5], delta))
 
-        
+        # Iterate through gates to plan trajectory
         for j in range(len(self.NOMINAL_GATES)):
 
+            # Set source coordinates for the first gate
             if j == 0:
                 source_x = self.initial_obs[0]
                 source_y = self.initial_obs[2]
                 
+            # Calculate destination coordinates for the current gate
             dest = self.GateList[j].calc_sequence(source_x , source_y)
 
+            # Generate waypoints for the current gate
             wp = self.generate_points([source_x, source_y], dest[0], num_waypoints, self.ObstList, True)
 
+            # Append waypoints to the overall waypoint list
             WP = WP + wp
 
-            # nwp = self.generate_points(dest[0], dest[2], 10, self.ObstList, False)
-
-            # WP = WP + nwp
+            # Append gate destination coordinates to the path
             for i in range(7):
                 WP.append((dest[i][0],dest[i][1],1))
-
             
+            # Use A* algorithm to find path from source to destination
             path = path + self.astar((source_x,source_y, 1), (dest[0][0],dest[0][1],1), all_coords=WP)
-            # path = path + nwp
             path = path + self.astar((dest[0][0],dest[0][1],1), (dest[1][0],dest[1][1],1), all_coords=WP)
             path = path + self.astar((dest[1][0],dest[1][1],1), (dest[2][0],dest[2][1],1), all_coords=WP)
             
+            # Update source coordinates for the next gate
             source_x = dest[2][0]
             source_y = dest[2][1]    
 
-        # # Calculate the Euclidean distance between two points
-        # def distance(x1, y1, x2, y2):
-        #     return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-
-        # Initialize the closest points
-        # closest_entry = None
-        # closest_distance = float('inf')
-
-        # Iterate over the entries
-        # for i in (self.GateList):
-        #     entry_x = i.entry[0]
-        #     entry_y = i.entry[1]
-        #     reference_x = initial_info["x_reference"][0]
-        #     reference_y = initial_info["x_reference"][1]
-
-        #     # Calculate the distance between the entry and the reference point
-        #     dist = distance(entry_x, entry_y, reference_x, reference_y)
-
-        #     # Update the closest points if a closer entry is found
-        #     if dist < closest_distance:
-        #         closest_gate = i
-        #         closest_distance = dist
-
-        # closest_entry is the entry closest to the reference point
-        # print("Closest entry:", closest_entry)  
-        # dest1 = closest_gate.calc_sequence(source_x , source_y)
-
-        # path = path + self.astar((source_x,source_y, 1), (dest1[0][0],dest1[0][1],1), all_coords=WP)
-        # path = path + self.astar((source_x,source_y, 1),(initial_info["x_reference"][0], initial_info["x_reference"][2], 1), all_coords=WP)
+        # Store planned waypoints
         self.waypoints = np.array(path)
+
         # Call a function in module `example_custom_utils`.
         ecu.exampleFunction()
 
-        # initial waypoint
-        # if use_firmware:
-        #     waypoints = [(self.initial_obs[0], self.initial_obs[2], initial_info["gate_dimensions"]["tall"]["height"])]  # Height is hardcoded scenario knowledge.
-        # else:
-        #     waypoints = [(self.initial_obs[0], self.initial_obs[2], self.initial_obs[4])]
-
-        # # Example code: hardcode waypoints 
-        # waypoints.append((-0.5, -3.0, 2.0))
-        # waypoints.append((-0.5, -2.0, 2.0))
-        # waypoints.append((-0.5, -1.0, 2.0))
-        # waypoints.append((-0.5,  0.0, 2.0))
-        # waypoints.append((-0.5,  1.0, 2.0))
-        # waypoints.append((-0.5,  2.0, 2.0))
-        # waypoints.append([initial_info["x_reference"][0], initial_info["x_reference"][2], initial_info["x_reference"][4]])
-
         # Polynomial fit.
-        # self.waypoints = np.array(waypoints)
         deg = 8
-        from scipy.interpolate import UnivariateSpline
-        t = np.arange(self.waypoints.shape[0])
-        # print("t",t)
-        # fx = np.poly1d(np.polyfit(t, self.waypoints[:,0], deg))
-        # fy = np.poly1d(np.polyfit(t, self.waypoints[:,1], deg))
-        # fz = np.poly1d(np.polyfit(t, self.waypoints[:,2], deg))
-        duration = 20
-        # t_scaled = np.linspace(t[0], t[-1], int(duration*self.CTRL_FREQ))
-        # self.ref_x = fx(t_scaled)
-        # self.ref_y = fy(t_scaled)
-        # self.ref_z = fz(t_scaled)
         from scipy.interpolate import interp1d
+        t = np.arange(self.waypoints.shape[0])
         spline_x = interp1d(t, self.waypoints[:, 0], kind='linear')
         spline_y = interp1d(t, self.waypoints[:, 1], kind='linear')
         spline_z = interp1d(t, self.waypoints[:, 2], kind='linear')
 
         # Interpolate along the splines to get the reference trajectory
+        duration = 20
         t_scaled = np.linspace(t[0], t[-1], int(duration * self.CTRL_FREQ))
         self.ref_x = spline_x(t_scaled)
         self.ref_y = spline_y(t_scaled)
         self.ref_z = spline_z(t_scaled)
 
-        #########################
-        # REPLACE THIS (END) ####
-        #########################
-
         return t_scaled
+
 
     def cmdFirmware(self,
                     time,
